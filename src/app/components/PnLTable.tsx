@@ -1,0 +1,149 @@
+'use client';
+
+import React, { useMemo } from 'react';
+import { Leg, GroupSettings, ModelParameters } from './StrategyBuilder';
+import { calculatePayoff } from '../utils/payoff';
+import { calculateTheoreticalPrice } from '../utils/black-scholes';
+import { formatNumber } from '../utils/formatting';
+
+const CONTRACT_SIZE = 100;
+
+interface PnLTableProps {
+  legs: Leg[];
+  underlyingPrice: number;
+  groupSettings: Record<string, GroupSettings>;
+  onUpdateGroupSettings: (groupId: string, newSettings: Partial<GroupSettings>) => void;
+  modelParameters: ModelParameters;
+}
+
+const PnLTable: React.FC<PnLTableProps> = ({ legs, underlyingPrice, groupSettings, onUpdateGroupSettings, modelParameters }) => {
+
+    const tableData = useMemo(() => {
+        const activeLegs = legs.filter(leg => leg.active);
+        if (activeLegs.length === 0 || underlyingPrice <= 0) {
+            return { headers: { top: [], sub: [] }, rows: [] };
+        }
+
+        const groups = activeLegs.reduce((acc, leg) => {
+            const groupId = leg.groupId || '1';
+            if (!acc[groupId]) acc[groupId] = [];
+            acc[groupId].push(leg);
+            return acc;
+        }, {} as Record<string, Leg[]>);
+
+        const groupIds = Object.keys(groups);
+        
+        const topHeaders = [
+            { content: 'Escenario', colSpan: 2 },
+            ...groupIds.map(id => ({ content: 
+                <div key={id} className="flex items-center justify-center gap-2">
+                    <input 
+                        type="checkbox"
+                        checked={groupSettings[id]?.isEnabled ?? true}
+                        onChange={(e) => onUpdateGroupSettings(id, { isEnabled: e.target.checked })}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <input 
+                        type="text"
+                        value={groupSettings[id]?.name ?? `Grupo ${id}`}
+                        onChange={(e) => onUpdateGroupSettings(id, { name: e.target.value })}
+                        className="p-1 bg-transparent w-24 border-b border-gray-400 focus:outline-none focus:border-blue-500 text-center"
+                    />
+                </div>,
+                colSpan: 2 
+            })),
+            { content: 'Total', colSpan: 2 },
+        ];
+
+        const subHeaders = ['Precio', '% Cambio', ...groupIds.flatMap(() => ['Finish', 'Teórico']), 'Finish', 'Teórico'];
+
+        const rows = [];
+        const t = modelParameters.timeToExpiry / 365;
+        const r = modelParameters.riskFreeRate / 100;
+        const v = modelParameters.volatility / 100;
+
+        type CellData = { value: number | string; isNumber: boolean };
+
+        for (let i = -20; i <= 20; i += 2) {
+            const percentage = i / 100;
+            const price = underlyingPrice * (1 + percentage);
+            
+            const rowData: CellData[] = [ { value: price, isNumber: true }, { value: `${i}%`, isNumber: false } ];
+            
+            let totalFinishPayoff = 0;
+            let totalTheoreticalPayoff = 0;
+
+            groupIds.forEach(id => {
+                const groupLegs = groups[id];
+                const groupFinishPayoff = groupLegs.reduce((total, leg) => total + calculatePayoff(price, leg), 0);
+                
+                const groupTheoreticalPayoff = groupLegs.reduce((total, leg) => {
+                    const theoreticalValue = calculateTheoreticalPrice(leg, price, r, v, t);
+                    const pnl = (theoreticalValue - leg.premium) * leg.quantity * (leg.type === 'underlying' ? 1 : CONTRACT_SIZE) * (leg.action === 'buy' ? 1 : -1);
+                    return total + pnl;
+                }, 0);
+
+                if (groupSettings[id]?.isEnabled ?? true) {
+                    totalFinishPayoff += groupFinishPayoff;
+                    totalTheoreticalPayoff += groupTheoreticalPayoff;
+                }
+                rowData.push({ value: groupFinishPayoff, isNumber: true }, { value: groupTheoreticalPayoff, isNumber: true });
+            });
+
+            rowData.push({ value: totalFinishPayoff, isNumber: true }, { value: totalTheoreticalPayoff, isNumber: true });
+            rows.push(rowData);
+        }
+
+        return { headers: { top: topHeaders, sub: subHeaders }, rows };
+
+    }, [legs, underlyingPrice, groupSettings, onUpdateGroupSettings, modelParameters]);
+
+    const getCellClass = (cellValue: number | string) => {
+        const value = Number(cellValue);
+        if (isNaN(value)) return 'text-gray-900';
+        if (value > 0) return 'text-green-600 font-medium';
+        if (value < 0) return 'text-red-600 font-medium';
+        return 'text-gray-700';
+    };
+
+    if (tableData.rows.length === 0) return null;
+
+    return (
+        <div className="mt-6 bg-white p-4 shadow-lg rounded-lg">
+            <h3 className="text-lg font-semibold text-blue-800 border-b-2 border-blue-600 pb-2 mb-4">Tabla de Ganancias y Pérdidas (P&L)</h3>
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-center">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            {tableData.headers.top.map((header, index) => (
+                                <th key={index} colSpan={header.colSpan} scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    {header.content}
+                                </th>
+                            ))}
+                        </tr>
+                        <tr>
+                            {tableData.headers.sub.map((header, index) => (
+                                <th key={index} scope="col" className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-t border-gray-200">
+                                    {header}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {tableData.rows.map((row, rowIndex) => (
+                            <tr key={rowIndex} className="hover:bg-gray-50">
+                                {row.map((cell, cellIndex) => (
+                                    <td key={cellIndex} className={`px-6 py-4 whitespace-nowrap text-sm ${getCellClass(cell.value)}`}>
+                                        {cell.isNumber ? formatNumber(cell.value as number) : cell.value}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+export default PnLTable;
