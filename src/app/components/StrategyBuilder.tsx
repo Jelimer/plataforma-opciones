@@ -19,12 +19,7 @@ export interface Leg {
   quantity: number;
   active: boolean;
   comment?: string;
-  groupId: string;
-}
-
-export interface GroupSettings {
-    name: string;
-    isEnabled: boolean;
+  strategyName: string;
 }
 
 export interface ModelParameters {
@@ -37,7 +32,6 @@ export interface SavedStrategy {
     name: string;
     legs: Leg[];
     underlyingPrice: number;
-    groupSettings: Record<string, GroupSettings>;
     modelParameters: ModelParameters;
 }
 
@@ -45,40 +39,40 @@ export interface SavedStrategy {
 const strategyTemplates: StrategyTemplate[] = [
     {
         name: "Long Call",
-        legs: [{ action: 'buy', type: 'call', strike: 100, premium: 5, quantity: 1, groupId: '1' }]
+        legs: [{ action: 'buy', type: 'call', strike: 100, premium: 5, quantity: 1 }]
     },
     {
         name: "Long Put",
-        legs: [{ action: 'buy', type: 'put', strike: 100, premium: 5, quantity: 1, groupId: '1' }]
+        legs: [{ action: 'buy', type: 'put', strike: 100, premium: 5, quantity: 1 }]
     },
     {
         name: "Covered Call",
         legs: [
-            { action: 'buy', type: 'underlying', strike: 0, premium: 100, quantity: 1, groupId: '1' },
-            { action: 'sell', type: 'call', strike: 105, premium: 2, quantity: 1, groupId: '1' }
+            { action: 'buy', type: 'underlying', strike: 0, premium: 100, quantity: 1 },
+            { action: 'sell', type: 'call', strike: 105, premium: 2, quantity: 1 }
         ]
     },
     {
         name: "Long Straddle",
         legs: [
-            { action: 'buy', type: 'call', strike: 100, premium: 3, quantity: 1, groupId: '1' },
-            { action: 'buy', type: 'put', strike: 100, premium: 3, quantity: 1, groupId: '1' }
+            { action: 'buy', type: 'call', strike: 100, premium: 3, quantity: 1 },
+            { action: 'buy', type: 'put', strike: 100, premium: 3, quantity: 1 }
         ]
     },
     {
         name: "Iron Condor",
         legs: [
-            { action: 'sell', type: 'put', strike: 95, premium: 2, quantity: 1, groupId: '1' },
-            { action: 'buy', type: 'put', strike: 90, premium: 1, quantity: 1, groupId: '1' },
-            { action: 'sell', type: 'call', strike: 105, premium: 2, quantity: 1, groupId: '1' },
-            { action: 'buy', type: 'call', strike: 110, premium: 1, quantity: 1, groupId: '1' }
+            { action: 'sell', type: 'put', strike: 95, premium: 2, quantity: 1 },
+            { action: 'buy', type: 'put', strike: 90, premium: 1, quantity: 1 },
+            { action: 'sell', type: 'call', strike: 105, premium: 2, quantity: 1 },
+            { action: 'buy', type: 'call', strike: 110, premium: 1, quantity: 1 }
         ]
     }
 ];
 
 interface StrategyTemplate {
     name: string;
-    legs: Omit<Leg, 'id' | 'active' | 'comment'>[];
+    legs: Omit<Leg, 'id' | 'active' | 'comment' | 'strategyName'>[];
 }
 
 const StrategyBuilder: React.FC = () => {
@@ -87,15 +81,12 @@ const StrategyBuilder: React.FC = () => {
   const [legs, setLegs] = useState<Leg[]>([]);
   const [underlyingPrice, setUnderlyingPrice] = useState(100);
   const [editingLeg, setEditingLeg] = useState<Leg | null>(null);
-  
-  // Group settings state
-  const [groupSettings, setGroupSettings] = useState<Record<string, GroupSettings>>({});
 
   // Black-Scholes model parameters state
-  const [modelParameters, setModelParameters] = useState<ModelParameters>({ 
-    timeToExpiry: 30, 
-    riskFreeRate: 5, 
-    volatility: 20 
+  const [modelParameters, setModelParameters] = useState<ModelParameters>({
+    timeToExpiry: 30,
+    riskFreeRate: 5,
+    volatility: 20
   });
 
   // Saved strategies state
@@ -106,11 +97,10 @@ const StrategyBuilder: React.FC = () => {
     try {
       const savedState = localStorage.getItem('optionsCurrentStrategy');
       if (savedState) {
-        const { name, legs, price, groups, params } = JSON.parse(savedState);
+        const { name, legs, price, params } = JSON.parse(savedState);
         if (name) setStrategyName(name);
         if (legs) setLegs(legs);
         if (price) setUnderlyingPrice(price);
-        if (groups) setGroupSettings(groups);
         if (params) setModelParameters(params);
       }
       const savedAll = localStorage.getItem('optionsSavedStrategies');
@@ -122,39 +112,25 @@ const StrategyBuilder: React.FC = () => {
     }
   }, []);
 
-  // Sync group settings with legs to add new groups automatically
-  useEffect(() => {
-    const newSettings = { ...groupSettings };
-    let needsUpdate = false;
-    legs.forEach(leg => {
-        if (!newSettings[leg.groupId]) {
-            newSettings[leg.groupId] = { name: `Grupo ${leg.groupId}`, isEnabled: true };
-            needsUpdate = true;
-        }
-    });
-    if (needsUpdate) setGroupSettings(newSettings);
-  }, [legs, groupSettings]);
-
   // Save current strategy to localStorage whenever any part of it changes
   useEffect(() => {
     const currentState = {
         name: strategyName,
         legs: legs,
         price: underlyingPrice,
-        groups: groupSettings,
         params: modelParameters
     };
     localStorage.setItem('optionsCurrentStrategy', JSON.stringify(currentState));
     localStorage.setItem('optionsSavedStrategies', JSON.stringify(savedStrategies));
-  }, [strategyName, legs, underlyingPrice, groupSettings, modelParameters, savedStrategies]);
+  }, [strategyName, legs, underlyingPrice, modelParameters, savedStrategies]);
 
   // --- Handlers ---
-  const handleSaveLeg = (legData: Omit<Leg, 'id' | 'active' | 'comment'>) => {
+  const handleSaveLeg = (legData: Omit<Leg, 'id' | 'active' | 'comment' | 'strategyName'>) => {
     if (editingLeg) {
-      setLegs(legs.map(l => l.id === editingLeg.id ? { ...editingLeg, ...legData } : l));
+      setLegs(legs.map(l => l.id === editingLeg.id ? { ...editingLeg, ...legData, strategyName: strategyName } : l));
       setEditingLeg(null);
     } else {
-      setLegs([...legs, { ...legData, id: Date.now(), active: true, comment: '' }]);
+      setLegs([...legs, { ...legData, id: Date.now(), active: true, comment: '', strategyName: strategyName }]);
     }
   };
 
@@ -162,32 +138,21 @@ const StrategyBuilder: React.FC = () => {
     setLegs(legs.map(leg => leg.id === id ? { ...leg, ...updatedProperties } : leg));
   };
 
-  const handleUpdateGroupSettings = (groupId: string, newSettings: Partial<GroupSettings>) => {
-    setGroupSettings(prev => ({ ...prev, [groupId]: { ...prev[groupId], ...newSettings } }));
-  };
-
   const handleSetEditingLeg = (leg: Leg) => setEditingLeg(leg);
   const handleCancelEdit = () => setEditingLeg(null);
   const deleteLeg = (id: number) => setLegs(legs.filter(leg => leg.id !== id));
 
-  const applyTemplate = (templateLegs: Omit<Leg, 'id' | 'active' | 'comment'>[]) => {
-    const newLegs: Leg[] = templateLegs.map(leg => ({ ...leg, id: Date.now() + Math.random(), active: true, comment: '' }));
+  const applyTemplate = (template: StrategyTemplate) => {
+    const newLegs: Leg[] = template.legs.map(leg => ({ ...leg, id: Date.now() + Math.random(), active: true, comment: '', strategyName: template.name }));
     setLegs(newLegs);
     setEditingLeg(null);
-    setStrategyName("Estrategia de Plantilla");
-    const newSettings: Record<string, GroupSettings> = {};
-    newLegs.forEach(leg => {
-        if (!newSettings[leg.groupId]) {
-            newSettings[leg.groupId] = { name: `Grupo ${leg.groupId}`, isEnabled: true };
-        }
-    });
-    setGroupSettings(newSettings);
+    setStrategyName(template.name);
   };
 
   const saveCurrentStrategy = () => {
     const name = prompt("Introduce un nombre para guardar la estrategia:", strategyName);
     if (name && name.trim() !== '') {
-        const newSavedStrategy: SavedStrategy = { name: name.trim(), legs, underlyingPrice, groupSettings, modelParameters };
+        const newSavedStrategy: SavedStrategy = { name: name.trim(), legs, underlyingPrice, modelParameters };
         setSavedStrategies(prev => {
             const existingIndex = prev.findIndex(s => s.name === name.trim());
             if (existingIndex > -1) {
@@ -206,7 +171,6 @@ const StrategyBuilder: React.FC = () => {
     setStrategyName(strategyToLoad.name);
     setLegs(strategyToLoad.legs);
     setUnderlyingPrice(strategyToLoad.underlyingPrice);
-    setGroupSettings(strategyToLoad.groupSettings || {});
     setModelParameters(strategyToLoad.modelParameters || { timeToExpiry: 30, riskFreeRate: 5, volatility: 20 });
     setEditingLeg(null);
     alert(`Estrategia '${strategyToLoad.name}' cargada.`);
@@ -226,8 +190,8 @@ const StrategyBuilder: React.FC = () => {
             <h3 className="text-lg font-semibold text-blue-800 border-b-2 border-blue-600 pb-2">Datos de la Estrategia</h3>
             <div className="mt-4">
                 <label htmlFor="strategy-name" className="text-sm font-medium text-gray-700">Nombre de la Estrategia</label>
-                <input 
-                    type="text" 
+                <input
+                    type="text"
                     id="strategy-name"
                     value={strategyName}
                     onChange={(e) => setStrategyName(e.target.value)}
@@ -236,8 +200,8 @@ const StrategyBuilder: React.FC = () => {
                 />
             </div>
         </div>
-        <StrategyForm 
-            onSaveLeg={handleSaveLeg} 
+        <StrategyForm
+            onSaveLeg={handleSaveLeg}
             editingLeg={editingLeg}
             onCancelEdit={handleCancelEdit}
             strategyTemplates={strategyTemplates}
@@ -249,10 +213,10 @@ const StrategyBuilder: React.FC = () => {
             onLoadStrategy={loadStrategy}
             onDeleteStrategy={deleteStrategy}
         />
-        <LegsList 
-            legs={legs} 
-            strategyName={strategyName} 
-            onDeleteLeg={deleteLeg} 
+        <LegsList
+            legs={legs}
+            strategyName={strategyName}
+            onDeleteLeg={deleteLeg}
             onEditLeg={handleSetEditingLeg}
             onUpdateLeg={updateLeg}
         />
@@ -261,8 +225,8 @@ const StrategyBuilder: React.FC = () => {
         <div className="bg-white p-4 shadow-lg rounded-lg">
             <div className="mb-4">
                 <label htmlFor="underlying-price" className="block text-sm font-medium text-gray-700">Precio Actual del Subyacente</label>
-                <input 
-                    type="number" 
+                <input
+                    type="number"
                     id="underlying-price"
                     value={underlyingPrice}
                     onChange={(e) => setUnderlyingPrice(parseFloat(e.target.value) || 0)}
@@ -274,16 +238,14 @@ const StrategyBuilder: React.FC = () => {
         <div className="bg-white p-4 shadow-lg rounded-lg">
             <Summary legs={legs} underlyingPrice={underlyingPrice} />
         </div>
-        <PnLTable 
-            legs={legs} 
-            underlyingPrice={underlyingPrice} 
-            groupSettings={groupSettings}
-            onUpdateGroupSettings={handleUpdateGroupSettings}
+        <PnLTable
+            legs={legs}
+            underlyingPrice={underlyingPrice}
             modelParameters={modelParameters}
         />
-        <GreeksDisplay 
-            legs={legs} 
-            underlyingPrice={underlyingPrice} 
+        <GreeksDisplay
+            legs={legs}
+            underlyingPrice={underlyingPrice}
             modelParameters={modelParameters}
             onModelParametersChange={setModelParameters}
         />

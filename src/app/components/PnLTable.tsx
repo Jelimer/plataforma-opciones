@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Leg, GroupSettings, ModelParameters } from './StrategyBuilder';
+import { Leg, ModelParameters } from './StrategyBuilder';
 import { calculatePayoff } from '../utils/payoff';
 import { calculateTheoreticalPrice } from '../utils/black-scholes';
 import { formatNumber } from '../utils/formatting';
@@ -11,12 +11,10 @@ const CONTRACT_SIZE = 100;
 interface PnLTableProps {
   legs: Leg[];
   underlyingPrice: number;
-  groupSettings: Record<string, GroupSettings>;
-  onUpdateGroupSettings: (groupId: string, newSettings: Partial<GroupSettings>) => void;
   modelParameters: ModelParameters;
 }
 
-const PnLTable: React.FC<PnLTableProps> = ({ legs, underlyingPrice, groupSettings, onUpdateGroupSettings, modelParameters }) => {
+const PnLTable: React.FC<PnLTableProps> = ({ legs, underlyingPrice, modelParameters }) => {
 
     const tableData = useMemo(() => {
         const activeLegs = legs.filter(leg => leg.active);
@@ -25,37 +23,21 @@ const PnLTable: React.FC<PnLTableProps> = ({ legs, underlyingPrice, groupSetting
         }
 
         const groups = activeLegs.reduce((acc, leg) => {
-            const groupId = leg.groupId || '1';
-            if (!acc[groupId]) acc[groupId] = [];
-            acc[groupId].push(leg);
+            const strategyName = leg.strategyName || 'Estrategia sin nombre';
+            if (!acc[strategyName]) acc[strategyName] = [];
+            acc[strategyName].push(leg);
             return acc;
         }, {} as Record<string, Leg[]>);
 
-        const groupIds = Object.keys(groups);
+        const strategyNames = Object.keys(groups);
         
         const topHeaders = [
             { content: 'Escenario', colSpan: 2 },
-            ...groupIds.map(id => ({ content: 
-                <div key={id} className="flex items-center justify-center gap-2">
-                    <input 
-                        type="checkbox"
-                        checked={groupSettings[id]?.isEnabled ?? true}
-                        onChange={(e) => onUpdateGroupSettings(id, { isEnabled: e.target.checked })}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <input 
-                        type="text"
-                        value={groupSettings[id]?.name ?? `Grupo ${id}`}
-                        onChange={(e) => onUpdateGroupSettings(id, { name: e.target.value })}
-                        className="p-1 bg-transparent w-24 border-b border-gray-400 focus:outline-none focus:border-blue-500 text-center"
-                    />
-                </div>,
-                colSpan: 2 
-            })),
+            ...strategyNames.map(name => ({ content: name, colSpan: 2 })),
             { content: 'Total', colSpan: 2 },
         ];
 
-        const subHeaders = ['Precio', '% Cambio', ...groupIds.flatMap(() => ['Finish', 'Teórico']), 'Finish', 'Teórico'];
+        const subHeaders = ['Precio', '% Cambio', ...strategyNames.flatMap(() => ['Finish', 'Teórico']), 'Finish', 'Teórico'];
 
         const rows = [];
         const t = modelParameters.timeToExpiry / 365;
@@ -73,8 +55,8 @@ const PnLTable: React.FC<PnLTableProps> = ({ legs, underlyingPrice, groupSetting
             let totalFinishPayoff = 0;
             let totalTheoreticalPayoff = 0;
 
-            groupIds.forEach(id => {
-                const groupLegs = groups[id];
+            strategyNames.forEach(name => {
+                const groupLegs = groups[name];
                 const groupFinishPayoff = groupLegs.reduce((total, leg) => total + calculatePayoff(price, leg), 0);
                 
                 const groupTheoreticalPayoff = groupLegs.reduce((total, leg) => {
@@ -83,10 +65,8 @@ const PnLTable: React.FC<PnLTableProps> = ({ legs, underlyingPrice, groupSetting
                     return total + pnl;
                 }, 0);
 
-                if (groupSettings[id]?.isEnabled ?? true) {
-                    totalFinishPayoff += groupFinishPayoff;
-                    totalTheoreticalPayoff += groupTheoreticalPayoff;
-                }
+                totalFinishPayoff += groupFinishPayoff;
+                totalTheoreticalPayoff += groupTheoreticalPayoff;
                 rowData.push({ value: groupFinishPayoff, isNumber: true }, { value: groupTheoreticalPayoff, isNumber: true });
             });
 
@@ -96,7 +76,7 @@ const PnLTable: React.FC<PnLTableProps> = ({ legs, underlyingPrice, groupSetting
 
         return { headers: { top: topHeaders, sub: subHeaders }, rows };
 
-    }, [legs, underlyingPrice, groupSettings, onUpdateGroupSettings, modelParameters]);
+    }, [legs, underlyingPrice, modelParameters]);
 
     const getCellClass = (cellValue: number | string) => {
         const value = Number(cellValue);

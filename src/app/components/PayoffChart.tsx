@@ -40,13 +40,13 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
       return { xAxis: { type: 'value' }, yAxis: { type: 'value' }, series: [] };
     }
 
-    // Group legs by groupId
+    // Group legs by strategyName
     const groups = activeLegs.reduce((acc, leg) => {
-        const groupId = leg.groupId || '1';
-        if (!acc[groupId]) {
-            acc[groupId] = [];
+        const strategyName = leg.strategyName || 'Estrategia sin nombre';
+        if (!acc[strategyName]) {
+            acc[strategyName] = [];
         }
-        acc[groupId].push(leg);
+        acc[strategyName].push(leg);
         return acc;
     }, {} as Record<string, Leg[]>);
 
@@ -67,12 +67,12 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
       prices.push(p);
     }
 
-    const series: EChartSeries[] = Object.entries(groups).map(([groupId, groupLegs]) => {
+    const series: EChartSeries[] = Object.entries(groups).map(([strategyName, groupLegs]) => {
         const payoffs = prices.map(price => 
             groupLegs.reduce((total, leg) => total + calculatePayoff(price, leg), 0)
         );
         return {
-            name: `Grupo ${groupId}`,
+            name: strategyName,
             type: 'line',
             smooth: true,
             symbol: 'none',

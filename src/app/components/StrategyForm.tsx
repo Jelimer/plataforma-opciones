@@ -5,15 +5,15 @@ import { Leg } from './StrategyBuilder';
 
 interface StrategyTemplate {
     name: string;
-    legs: Omit<Leg, 'id' | 'active' | 'comment'>[];
+    legs: Omit<Leg, 'id' | 'active' | 'comment' | 'strategyName'>[];
 }
 
 interface StrategyFormProps {
-  onSaveLeg: (leg: Omit<Leg, 'id' | 'active' | 'comment'>) => void;
+  onSaveLeg: (leg: Omit<Leg, 'id' | 'active' | 'comment' | 'strategyName'>) => void;
   editingLeg: Leg | null;
   onCancelEdit: () => void;
   strategyTemplates: StrategyTemplate[];
-  onApplyTemplate: (legs: Omit<Leg, 'id' | 'active' | 'comment'>[]) => void;
+  onApplyTemplate: (template: StrategyTemplate) => void;
 }
 
 type ActionType = 'buy' | 'sell';
@@ -25,7 +25,6 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSaveLeg, editingLeg, onCa
   const [strike, setStrike] = useState(100);
   const [premium, setPremium] = useState(5);
   const [quantity, setQuantity] = useState(1);
-  const [groupId, setGroupId] = useState('1');
 
   useEffect(() => {
     if (editingLeg) {
@@ -34,7 +33,6 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSaveLeg, editingLeg, onCa
       setStrike(editingLeg.strike);
       setPremium(editingLeg.premium);
       setQuantity(editingLeg.quantity);
-      setGroupId(editingLeg.groupId);
     } else {
       // Reset to default when not editing
       setAction('buy');
@@ -42,7 +40,6 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSaveLeg, editingLeg, onCa
       setStrike(100);
       setPremium(5);
       setQuantity(1);
-      setGroupId('1');
     }
   }, [editingLeg]);
 
@@ -52,13 +49,12 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSaveLeg, editingLeg, onCa
         alert('Por favor, introduce valores numéricos válidos y positivos.');
         return;
     }
-    onSaveLeg({ action, type, strike: type === 'underlying' ? 0 : strike, premium, quantity, groupId });
+    onSaveLeg({ action, type, strike: type === 'underlying' ? 0 : strike, premium, quantity });
     if (!editingLeg) {
         // Reset form only when adding a new leg
         setStrike(100);
         setPremium(5);
         setQuantity(1);
-        setGroupId('1');
     }
   };
 
@@ -67,7 +63,7 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSaveLeg, editingLeg, onCa
     if (templateName) {
         const selectedTemplate = strategyTemplates.find(t => t.name === templateName);
         if (selectedTemplate) {
-            onApplyTemplate(selectedTemplate.legs);
+            onApplyTemplate(selectedTemplate);
         }
     }
   };
@@ -106,10 +102,6 @@ const StrategyForm: React.FC<StrategyFormProps> = ({ onSaveLeg, editingLeg, onCa
         <div>
           <label htmlFor="leg-quantity" className="block text-sm font-medium text-gray-700">Cantidad</label>
           <input type="number" id="leg-quantity" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value))} min="1" step="1" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
-        </div>
-        <div>
-          <label htmlFor="leg-group" className="block text-sm font-medium text-gray-700">Identificador de Grupo</label>
-          <input type="text" id="leg-group" value={groupId} onChange={(e) => setGroupId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
         </div>
       </div>
       <div className="mt-4 flex items-center gap-4">
