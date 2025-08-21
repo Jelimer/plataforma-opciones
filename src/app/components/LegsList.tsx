@@ -45,8 +45,8 @@ const LegsList: React.FC<LegsListProps> = ({ legs, strategyName, onDeleteLeg, on
                     className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <div className="text-sm">
-                      <span className={`mr-2 inline-block px-2 py-1 text-xs font-semibold rounded-full ${leg.groupId === '1' ? 'bg-pink-200 text-pink-800' : 'bg-indigo-200 text-indigo-800'}`}>
-                          ID: {leg.groupId}
+                      <span className="mr-2 inline-block px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-800">
+                          Estrategia: {leg.strategyName}
                       </span>
                       <span className={`${leg.action === 'buy' ? 'text-green-600' : 'text-red-600'} font-bold`}>
                           {leg.action === 'buy' ? 'COMPRA' : 'VENDE'} {leg.quantity}
