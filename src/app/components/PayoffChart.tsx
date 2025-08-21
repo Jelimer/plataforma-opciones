@@ -13,6 +13,32 @@ interface EChartTooltipParams {
     color: string;
 }
 
+interface MarkLineData {
+    name?: string;
+    xAxis?: number;
+    yAxis?: number;
+}
+
+interface MarkLine {
+    silent?: boolean;
+    symbol?: string | string[];
+    lineStyle?: object;
+    data?: MarkLineData[];
+    label?: object;
+}
+
+interface MarkPointData {
+    name?: string;
+    coord?: (number | string)[];
+    value?: string;
+    symbolOffset?: (number | string)[];
+}
+
+interface MarkPoint {
+    symbolSize?: number;
+    data?: MarkPointData[];
+}
+
 // Define a type for our chart series
 interface EChartSeries {
     name: string;
@@ -24,8 +50,8 @@ interface EChartSeries {
         width?: number;
         type?: 'solid' | 'dashed' | 'dotted';
     };
-    markLine?: any;
-    markPoint?: any;
+    markLine?: MarkLine;
+    markPoint?: MarkPoint;
 }
 
 interface PayoffChartProps {
@@ -104,7 +130,7 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
     const minLoss = Math.min(...totalPayoffs);
     const minLossPrice = prices[totalPayoffs.indexOf(minLoss)];
 
-    const markPointData = [];
+    const markPointData: MarkPointData[] = [];
     if (isFinite(maxProfit)) {
         markPointData.push({
             name: 'Max Profit',
@@ -219,8 +245,7 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
     };
   }, [legs, underlyingPrice]);
 
-  return <ReactECharts option={chartOption} style={{ height: '500px', width: '100%' }} />;
+  return <ReactECharts option={chartOption} style={{ height: '500px', width: '100%' }} />; 
 };
 
 export default PayoffChart;
-
