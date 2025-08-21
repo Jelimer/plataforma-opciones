@@ -39,7 +39,7 @@ const PnLTable: React.FC<PnLTableProps> = ({ legs, underlyingPrice, modelParamet
 
         const subHeaders = ['Precio', '% Cambio', ...strategyNames.flatMap(() => ['Finish', 'Teórico']), 'Finish', 'Teórico'];
 
-        const rows = [];
+        const rows: { data: CellData[], isUnderlyingPrice: boolean }[] = [];
         const t = modelParameters.timeToExpiry / 365;
         const r = modelParameters.riskFreeRate / 100;
         const v = modelParameters.volatility / 100;
@@ -71,14 +71,23 @@ const PnLTable: React.FC<PnLTableProps> = ({ legs, underlyingPrice, modelParamet
             });
 
             rowData.push({ value: totalFinishPayoff, isNumber: true }, { value: totalTheoreticalPayoff, isNumber: true });
-            rows.push(rowData);
+            rows.push({ data: rowData, isUnderlyingPrice: i === 0 });
         }
 
         return { headers: { top: topHeaders, sub: subHeaders }, rows };
 
     }, [legs, underlyingPrice, modelParameters]);
 
-    const getCellClass = (cellValue: number | string) => {
+    const getCellClass = (cellValue: number | string, columnIndex: number) => {
+        if (columnIndex === 0) { // "Precio" column
+            return 'text-gray-900 font-medium';
+        }
+        if (columnIndex === 1 && typeof cellValue === 'string' && cellValue.endsWith('%')) { // "% Cambio" column
+            const percentage = parseFloat(cellValue);
+            if (percentage > 0) return 'text-green-600 font-medium';
+            if (percentage < 0) return 'text-red-600 font-medium';
+            return 'text-gray-700';
+        }
         const value = Number(cellValue);
         if (isNaN(value)) return 'text-gray-900';
         if (value > 0) return 'text-green-600 font-medium';
@@ -111,9 +120,9 @@ const PnLTable: React.FC<PnLTableProps> = ({ legs, underlyingPrice, modelParamet
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {tableData.rows.map((row, rowIndex) => (
-                            <tr key={rowIndex} className="hover:bg-gray-50">
-                                {row.map((cell, cellIndex) => (
-                                    <td key={cellIndex} className={`px-6 py-4 whitespace-nowrap text-sm ${getCellClass(cell.value)}`}>
+                            <tr key={rowIndex} className={`${row.isUnderlyingPrice ? 'bg-yellow-100' : ''} hover:bg-gray-50`}>
+                                {row.data.map((cell, cellIndex) => (
+                                    <td key={cellIndex} className={`px-6 py-4 whitespace-nowrap text-sm ${getCellClass(cell.value, cellIndex)}`}>
                                         {cell.isNumber ? formatNumber(cell.value as number) : cell.value}
                                     </td>
                                 ))}
