@@ -24,6 +24,8 @@ interface EChartSeries {
         width?: number;
         type?: 'solid' | 'dashed' | 'dotted';
     };
+    markLine?: any;
+    markPoint?: any;
 }
 
 interface PayoffChartProps {
@@ -84,6 +86,42 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
     const totalPayoffs = prices.map(price => 
         activeLegs.reduce((total, leg) => total + calculatePayoff(price, leg), 0)
     );
+
+    const breakEvenPoints: number[] = [];
+    for (let i = 0; i < totalPayoffs.length - 1; i++) {
+        if (Math.sign(totalPayoffs[i]) !== Math.sign(totalPayoffs[i + 1])) {
+            const price1 = prices[i];
+            const price2 = prices[i + 1];
+            const payoff1 = totalPayoffs[i];
+            const payoff2 = totalPayoffs[i + 1];
+            const breakEven = price1 - payoff1 * (price2 - price1) / (payoff2 - payoff1);
+            breakEvenPoints.push(breakEven);
+        }
+    }
+
+    const maxProfit = Math.max(...totalPayoffs);
+    const maxProfitPrice = prices[totalPayoffs.indexOf(maxProfit)];
+    const minLoss = Math.min(...totalPayoffs);
+    const minLossPrice = prices[totalPayoffs.indexOf(minLoss)];
+
+    const markPointData = [];
+    if (isFinite(maxProfit)) {
+        markPointData.push({
+            name: 'Max Profit',
+            value: `Max Profit: ${formatCurrency(maxProfit)}`,
+            coord: [maxProfitPrice, maxProfit],
+            symbolOffset: [0, -30],
+        });
+    }
+    if (isFinite(minLoss)) {
+        markPointData.push({
+            name: 'Max Loss',
+            value: `Max Loss: ${formatCurrency(minLoss)}`,
+            coord: [minLossPrice, minLoss],
+            symbolOffset: [0, 30],
+        });
+    }
+
     series.push({
         name: 'Total',
         type: 'line',
@@ -91,6 +129,22 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
         symbol: 'none',
         lineStyle: { width: 4, type: 'solid' },
         data: prices.map((price, index) => [price, totalPayoffs[index]]),
+        markLine: {
+            symbol: 'none',
+            lineStyle: {
+                type: 'dashed',
+                color: '#4b5563'
+            },
+            label: {
+                formatter: '{b}',
+                position: 'insideEndTop'
+            },
+            data: breakEvenPoints.map(p => ({ name: `BE: ${formatCurrency(p)}`, xAxis: p }))
+        },
+        markPoint: {
+            symbolSize: 80,
+            data: markPointData
+        }
     });
 
     return {
@@ -103,12 +157,21 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
         trigger: 'axis',
         formatter: (params: EChartTooltipParams[]) => {
             if (!Array.isArray(params) || params.length === 0) return '';
-            let tooltip = `Precio: <strong>${formatCurrency(params[0].value[0])}</strong><br/>`;
+            const price = params[0].value[0];
+            let tooltip = `Precio: <strong>${formatCurrency(price)}</strong><br/>`;
             params.forEach(param => {
                 if (param.seriesName !== 'Línea Cero' && param.seriesName !== 'Precio Actual') {
                     tooltip += `<span style="color:${param.color}">●</span> ${param.seriesName}: <strong>${formatCurrency(param.value[1])}</strong><br/>`;
                 }
             });
+
+            tooltip += '<hr style="margin: 5px 0;" />';
+            tooltip += '<strong>Desglose de Patas:</strong><br/>';
+            activeLegs.forEach(leg => {
+                const payoff = calculatePayoff(price, leg);
+                tooltip += `${leg.action === 'buy' ? 'Compra' : 'Venta'} ${leg.quantity} ${leg.type} @ ${leg.strike}: <strong>${formatCurrency(payoff)}</strong><br/>`;
+            });
+
             return tooltip;
         },
       },
@@ -135,7 +198,7 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
       series: [...series, {
         name: 'Línea Cero',
         type: 'line',
-        markLine: { 
+        markLine: {
             silent: true, 
             symbol: 'none', 
             lineStyle: { type: 'dashed', color: '#4b5563' },
@@ -160,3 +223,4 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
 };
 
 export default PayoffChart;
+
