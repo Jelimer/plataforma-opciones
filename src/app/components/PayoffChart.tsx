@@ -99,12 +99,31 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
         const payoffs = prices.map(price => 
             groupLegs.reduce((total, leg) => total + calculatePayoff(price, leg), 0)
         );
+        const data = prices.map((price, index) => [price, payoffs[index]]);
         return {
             name: strategyName,
             type: 'line',
             smooth: true,
             symbol: 'none',
-            data: prices.map((price, index) => [price, payoffs[index]]),
+            data: data,
+            markPoint: {
+                symbolSize: 1,
+                label: {
+                    show: true,
+                    formatter: '{b}',
+                    color: '#000',
+                    fontSize: 12,
+                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                    padding: [5, 7],
+                    borderRadius: 4,
+                },
+                data: [
+                    {
+                        name: strategyName,
+                        coord: data[Math.floor(data.length * 0.8)], // Posicionar la etiqueta al 80% del recorrido
+                    }
+                ]
+            }
         };
     });
 
@@ -245,7 +264,7 @@ const PayoffChart: React.FC<PayoffChartProps> = ({ legs, underlyingPrice }) => {
     };
   }, [legs, underlyingPrice]);
 
-  return <ReactECharts option={chartOption} style={{ height: '500px', width: '100%' }} />; 
+  return <ReactECharts option={chartOption} style={{ height: '700px', width: '100%' }} />; 
 };
 
 export default PayoffChart;
